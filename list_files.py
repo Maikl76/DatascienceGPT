@@ -5,11 +5,19 @@ from google.oauth2 import service_account
 import pandas as pd
 from fastapi import FastAPI
 
-# 🔹 Načtení credentials.json z ENV proměnné (Render.com)
-credentials_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+# 🔹 🏆 METODA 1: Načtení `GOOGLE_CREDENTIALS` z Environment Variables (Render.com)
+if os.getenv("GOOGLE_CREDENTIALS"):
+    credentials_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+    credentials = service_account.Credentials.from_service_account_info(credentials_json)
+    print("✅ Používám GOOGLE_CREDENTIALS z Environment Variables.")
 
-# 🔹 Autentizace k API pomocí načtených údajů
-credentials = service_account.Credentials.from_service_account_info(credentials_json)
+# 🔹 🏆 METODA 2: Načtení `credentials.json` z lokálního souboru (GitHub)
+elif os.path.exists("credentials.json"):
+    credentials = service_account.Credentials.from_service_account_file("credentials.json")
+    print("✅ Používám `credentials.json` ze souboru.")
+
+else:
+    raise FileNotFoundError("❌ CHYBA: Nebyly nalezeny žádné přihlašovací údaje!")
 
 # 🔹 Vytvoření klienta Google Drive API
 drive_service = build("drive", "v3", credentials=credentials)
@@ -20,7 +28,7 @@ FOLDER_ID = "1UyApTKtmY2OvscPLcxdH-uwEy8l8rlfI"
 # 🔹 Název souboru, který chceme stáhnout
 FILE_NAME = "data.xlsx"
 
-# 🔹 Funkce pro získání ID souboru podle názvu (vždy najde aktuální soubor)
+# 🔹 Funkce pro získání ID souboru podle názvu
 def get_latest_file_id(folder_id, filename):
     query = f"'{folder_id}' in parents and name='{filename}' and trashed=false"
     results = drive_service.files().list(q=query, fields="files(id, name)").execute()
