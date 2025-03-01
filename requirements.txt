@@ -3,7 +3,6 @@ uvicorn
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
-google-auth-api-client
 google-api-python-client
 pandas
 openpyxl
