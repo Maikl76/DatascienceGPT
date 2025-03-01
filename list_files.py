@@ -5,48 +5,65 @@ from google.oauth2 import service_account
 import pandas as pd
 from fastapi import FastAPI
 
-# 🔹 🏆 METODA 1: Načtení `GOOGLE_CREDENTIALS` z Environment Variables (Render.com)
+# ✅ Ověření, jaké přihlašovací údaje jsou k dispozici
+credentials = None
+
+# 🔹 🏆 METODA 1: Použití `GOOGLE_CREDENTIALS` z Environment Variables (Render.com)
 if os.getenv("GOOGLE_CREDENTIALS"):
-    credentials_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
-    credentials = service_account.Credentials.from_service_account_info(credentials_json)
-    print("✅ Používám GOOGLE_CREDENTIALS z Environment Variables.")
+    try:
+        credentials_json = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+        credentials = service_account.Credentials.from_service_account_info(credentials_json)
+        print("✅ Používám GOOGLE_CREDENTIALS z Environment Variables.")
+    except json.JSONDecodeError as e:
+        print(f"❌ Chyba při načítání GOOGLE_CREDENTIALS: {e}")
 
-# 🔹 🏆 METODA 2: Načtení `credentials.json` z lokálního souboru (GitHub)
+# 🔹 🏆 METODA 2: Použití `credentials.json` (GitHub)
 elif os.path.exists("credentials.json"):
-    credentials = service_account.Credentials.from_service_account_file("credentials.json")
-    print("✅ Používám `credentials.json` ze souboru.")
+    try:
+        credentials = service_account.Credentials.from_service_account_file("credentials.json")
+        print("✅ Používám `credentials.json` ze souboru.")
+    except Exception as e:
+        print(f"❌ Chyba při načítání credentials.json: {e}")
 
-else:
+# 🔹 Pokud žádná metoda nefunguje → chyba
+if credentials is None:
     raise FileNotFoundError("❌ CHYBA: Nebyly nalezeny žádné přihlašovací údaje!")
 
-# 🔹 Vytvoření klienta Google Drive API
+# ✅ Vytvoření klienta Google Drive API
 drive_service = build("drive", "v3", credentials=credentials)
 
-# 🔹 ID složky na Google Drive (získané z URL)
+# ✅ ID složky na Google Drive (získané z URL)
 FOLDER_ID = "1UyApTKtmY2OvscPLcxdH-uwEy8l8rlfI"
 
-# 🔹 Název souboru, který chceme stáhnout
+# ✅ Název souboru, který chceme stáhnout
 FILE_NAME = "data.xlsx"
 
 # 🔹 Funkce pro získání ID souboru podle názvu
 def get_latest_file_id(folder_id, filename):
-    query = f"'{folder_id}' in parents and name='{filename}' and trashed=false"
-    results = drive_service.files().list(q=query, fields="files(id, name)").execute()
-    files = results.get("files", [])
+    try:
+        query = f"'{folder_id}' in parents and name='{filename}' and trashed=false"
+        results = drive_service.files().list(q=query, fields="files(id, name)").execute()
+        files = results.get("files", [])
 
-    if not files:
-        print(f"❌ Soubor '{filename}' nebyl nalezen ve složce.")
+        if not files:
+            print(f"❌ Soubor '{filename}' nebyl nalezen ve složce.")
+            return None
+        return files[0]["id"]
+    except Exception as e:
+        print(f"❌ Chyba při získávání ID souboru: {e}")
         return None
-    return files[0]["id"]
 
 # 🔹 Funkce pro stažení souboru
 def download_file(file_id, filename):
-    request = drive_service.files().get_media(fileId=file_id)
-    with open(filename, "wb") as file:
-        file.write(request.execute())
-    print(f"✅ Soubor '{filename}' byl stažen!")
+    try:
+        request = drive_service.files().get_media(fileId=file_id)
+        with open(filename, "wb") as file:
+            file.write(request.execute())
+        print(f"✅ Soubor '{filename}' byl stažen!")
+    except Exception as e:
+        print(f"❌ Chyba při stahování souboru '{filename}': {e}")
 
-# 🔹 Spustíme stažení aktuálního `data.xlsx`
+# ✅ Spustíme stažení aktuálního `data.xlsx`
 file_id = get_latest_file_id(FOLDER_ID, FILE_NAME)
 if file_id:
     download_file(file_id, "data.xlsx")
@@ -57,7 +74,7 @@ try:
     print("📊 Prvních 5 řádků souboru:")
     print(df.head())
 except Exception as e:
-    print("❌ Chyba při načítání Excel souboru:", e)
+    print(f"❌ Chyba při načítání Excel souboru: {e}")
 
 # 🔹 FastAPI server pro přístup k datům
 app = FastAPI()
